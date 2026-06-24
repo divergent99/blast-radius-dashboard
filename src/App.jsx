@@ -154,6 +154,28 @@ export default function App() {
 
   const clearA = () => { setAData(null); setActMr(null); if (gData) { const { nodes: n, edges: e } = buildGraph(gData.files, gData.edges); setNodes(n); setEdges(e); } };
 
+  const [webhookLoading, setWHL] = useState(null);
+  const triggerWebhook = async (mrIid) => {
+    if (!projectPath || !mrIid) return;
+    setWHL(mrIid);
+    try {
+      const r = await fetch(`${BACKEND_URL}/webhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Gitlab-Event": "Merge Request Hook", "X-Gitlab-Token": "blastradius123" },
+        body: JSON.stringify({
+          object_attributes: { iid: parseInt(mrIid), title: `MR !${mrIid}`, action: "open" },
+          project: { id: 83492513, path_with_namespace: projectPath },
+          user: { username: "abhineetsharma77" },
+        }),
+      });
+      const j = await r.json();
+      if (j.status === "accepted") {
+        setChat(c => [...c, { role: "ai", text: `✅ Blast radius comment is being posted to MR !${mrIid} on GitLab. Check the merge request in a few seconds.` }]);
+        setChatTab("chat");
+      }
+    } catch (err) { setError(err.message); } finally { setWHL(null); }
+  };
+
   const onNodeClick = useCallback((_, node) => {
     setClickedNode(node.data);
     setChatTab("file");
@@ -339,6 +361,11 @@ export default function App() {
                   style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: !gData || loadingA ? "#EDF2F7" : "linear-gradient(135deg,#3B82F6,#1D4ED8)", color: !gData || loadingA ? "#94A3B8" : "#fff", fontWeight: 800, fontSize: 13, flexShrink: 0, boxShadow: !gData || loadingA ? "none" : "0 2px 8px #3B82F640" }}>
                   {loadingA && activeMr === mr.value ? "·" : "→"}
                 </button>
+                <button onClick={() => triggerWebhook(mr.value)} disabled={!mr.value || webhookLoading === mr.value}
+                  title="Post blast radius comment to GitLab MR"
+                  style={{ padding: "6px 9px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: webhookLoading === mr.value ? "#EDF2F7" : "#F8FAFC", color: webhookLoading === mr.value ? "#94A3B8" : "#475569", fontSize: 12, flexShrink: 0, boxShadow: "none" }}>
+                  {webhookLoading === mr.value ? "·" : "💬"}
+                </button>
                 {mrList.length > 1 && <button onClick={() => setMrList(l => l.filter(m => m.id !== mr.id))} style={{ padding: "6px 7px", borderRadius: 7, border: "1px solid #E2E8F0", background: "none", color: "#CBD5E0", fontSize: 12 }}>✕</button>}
               </div>
             ))}
@@ -402,11 +429,23 @@ export default function App() {
         {/* ── CENTER GRAPH ── */}
         <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#F8FAFC" }}>
           {!gData && !loadingG && (
-            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, pointerEvents: "none" }}>
-              <div style={{ fontSize: 52, opacity: 0.07 }}>💥</div>
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, pointerEvents: "none", userSelect: "none" }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#CBD5E0", marginBottom: 4 }}>Dependency Impact Graph</div>
-                <div style={{ fontSize: 11, color: "#E2E8F0", maxWidth: 220, lineHeight: 1.7 }}>Load a project to visualize its full dependency graph</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#CBD5E0", letterSpacing: 4, textTransform: "uppercase", marginBottom: 16 }}>
+                  GitLab Transcend Hackathon 2026
+                </div>
+                <div style={{ fontSize: 80, fontWeight: 900, color: "#EDF2F7", letterSpacing: "-3px", lineHeight: 1, fontFamily: "'Inter', sans-serif" }}>
+                  Blast Radius
+                </div>
+                <div style={{ fontSize: 15, color: "#CBD5E0", marginTop: 14, fontWeight: 500 }}>
+                  Know what breaks before you merge
+                </div>
+                <div style={{ marginTop: 12, fontSize: 11, color: "#E2E8F0", fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+                  Powered by GitLab Orbit · Claude Sonnet 4.6
+                </div>
+                <div style={{ marginTop: 24, fontSize: 11, color: "#E2E8F0" }}>
+                  ← Load a project to visualize its dependency graph
+                </div>
               </div>
             </div>
           )}
