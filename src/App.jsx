@@ -27,14 +27,14 @@ const renderTableHTML = (block) => {
   if (rows.length < 2) return block;
   const headerCells = rows[0].split("|").map(c => c.trim()).filter(Boolean);
   const bodyRows = rows.slice(2); // skip separator row
-  const thStyle = "border:1px solid #E2E8F0;padding:5px 8px;background:#F8FAFC;font-weight:700;color:#1A202C;text-align:left";
-  const tdStyle = "border:1px solid #E2E8F0;padding:5px 8px;color:#4A5568";
+  const thStyle = "border:1px solid #E2E8F0;padding:4px 6px;background:#F8FAFC;font-weight:700;color:#1A202C;text-align:left;word-break:break-word;font-size:10px";
+  const tdStyle = "border:1px solid #E2E8F0;padding:4px 6px;color:#4A5568;word-break:break-word;font-size:10px";
   const ths = headerCells.map(c => `<th style="${thStyle}">${c}</th>`).join("");
   const trs = bodyRows.map(row => {
     const cells = row.split("|").map(c => c.trim()).filter(Boolean);
     return `<tr>${cells.map(c => `<td style="${tdStyle}">${c}</td>`).join("")}</tr>`;
   }).join("");
-  return `<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:11px"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+  return `<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:10px;table-layout:fixed;word-wrap:break-word"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
 };
 
 const MD = ({ text }) => {
