@@ -123,7 +123,9 @@ export default function App() {
   const [chat, setChat]       = useState([{ role: "ai", text: "Hey! Ask me anything about this codebase — dependencies, blast radius, architecture, anything." }]);
   const [chatIn, setChatIn]   = useState("");
   const [chatLoad, setChatL]  = useState(false);
-  const [chatTab, setChatTab] = useState("chat"); // "chat" | "file"
+  const [chatTab, setChatTab] = useState("chat");
+  const [webhookLoading, setWHL] = useState(null);
+  const [webhookStatus, setWHS] = useState({});
   const bottomRef = useRef(null);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chat]);
 
@@ -154,14 +156,18 @@ export default function App() {
 
   const clearA = () => { setAData(null); setActMr(null); if (gData) { const { nodes: n, edges: e } = buildGraph(gData.files, gData.edges); setNodes(n); setEdges(e); } };
 
-  const [webhookLoading, setWHL] = useState(null);
   const triggerWebhook = async (mrIid) => {
     if (!projectPath || !mrIid) return;
     setWHL(mrIid);
+    setWHS(s => ({ ...s, [mrIid]: "loading" }));
     try {
       const r = await fetch(`${BACKEND_URL}/webhook`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Gitlab-Event": "Merge Request Hook", "X-Gitlab-Token": "blastradius123" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Gitlab-Event": "Merge Request Hook",
+          "X-Gitlab-Token": "blastradius123",
+        },
         body: JSON.stringify({
           object_attributes: { iid: parseInt(mrIid), title: `MR !${mrIid}`, action: "open" },
           project: { id: 83492513, path_with_namespace: projectPath },
@@ -170,10 +176,12 @@ export default function App() {
       });
       const j = await r.json();
       if (j.status === "accepted") {
-        setChat(c => [...c, { role: "ai", text: `✅ Blast radius comment is being posted to MR !${mrIid} on GitLab. Check the merge request in a few seconds.` }]);
+        setWHS(s => ({ ...s, [mrIid]: "done" }));
+        setChat(c => [...c, { role: "ai", text: `✅ Blast radius comment posted to MR !${mrIid} on GitLab. Check the merge request in a few seconds.` }]);
         setChatTab("chat");
+        setTimeout(() => setWHS(s => ({ ...s, [mrIid]: null })), 3000);
       }
-    } catch (err) { setError(err.message); } finally { setWHL(null); }
+    } catch (err) { setError(err.message); setWHS(s => ({ ...s, [mrIid]: null })); } finally { setWHL(null); }
   };
 
   const onNodeClick = useCallback((_, node) => {
@@ -197,7 +205,6 @@ export default function App() {
   const totalSym  = aData ? Object.values(aData.imported_symbols).flat().length : 0;
   const suggestions = ["What does this project do?", "Which file is most risky to change?", "Explain the auth flow", "What imports token.py?"];
 
-  // File detail panel content
   const FileDetail = ({ node }) => {
     const th = dirTheme(node.fullPath || "");
     const fileEdgesOut = gData?.edges.filter(e => e.source === node.fullPath) || [];
@@ -206,7 +213,6 @@ export default function App() {
     const isAffected = !isChanged && Object.values(aData?.blast_radius || {}).flat().includes(node.fullPath);
     return (
       <div style={{ padding: "14px", display: "flex", flexDirection: "column", gap: 14 }}>
-        {/* File header */}
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 9, background: th.light, border: `1.5px solid ${th.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <div style={{ width: 10, height: 10, borderRadius: "50%", background: th.dot }} />
@@ -216,29 +222,24 @@ export default function App() {
             <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 2, wordBreak: "break-all" }}>{node.fullPath}</div>
           </div>
         </div>
-
-        {/* Status badges */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: th.light, color: th.accent, border: `1px solid ${th.border}` }}>{node.dir?.split("/").pop() || "root"}</span>
           {isChanged  && <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE" }}>◆ Changed</span>}
           {isAffected && <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: "#FFFBEB", color: "#92400E", border: "1px solid #FDE68A" }}>● At Risk</span>}
         </div>
-
-        {/* Description */}
         {descs[node.fullPath] && (
           <div style={{ padding: "10px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 9, fontSize: 12, color: "#475569", lineHeight: 1.6 }}>
             {descs[node.fullPath]}
           </div>
         )}
-
-        {/* Imports (outgoing) */}
         {fileEdgesOut.length > 0 && (
           <div>
             <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 7 }}>Imports ({fileEdgesOut.length})</div>
             {fileEdgesOut.map((e, i) => {
               const t = dirTheme(e.target);
               return (
-                <div key={i} onClick={() => setClickedNode({ label: e.target.split("/").pop(), fullPath: e.target, dir: e.target.split("/").slice(0, -1).join("/"), isChanged: false, isAffected: false, symbols: [] })} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", marginBottom: 4, borderRadius: 7, background: "#F8FAFC", border: "1px solid #E2E8F0", cursor: "pointer", transition: "all .15s" }}
+                <div key={i} onClick={() => setClickedNode({ label: e.target.split("/").pop(), fullPath: e.target, dir: e.target.split("/").slice(0, -1).join("/"), isChanged: false, isAffected: false, symbols: [] })}
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", marginBottom: 4, borderRadius: 7, background: "#F8FAFC", border: "1px solid #E2E8F0", cursor: "pointer", transition: "all .15s" }}
                   onMouseEnter={ev => { ev.currentTarget.style.borderColor = t.border; ev.currentTarget.style.background = t.light; }}
                   onMouseLeave={ev => { ev.currentTarget.style.borderColor = "#E2E8F0"; ev.currentTarget.style.background = "#F8FAFC"; }}>
                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: t.dot, flexShrink: 0 }} />
@@ -252,15 +253,14 @@ export default function App() {
             })}
           </div>
         )}
-
-        {/* Imported by (incoming) */}
         {fileEdgesIn.length > 0 && (
           <div>
             <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 7 }}>Imported by ({fileEdgesIn.length})</div>
             {fileEdgesIn.map((e, i) => {
               const t = dirTheme(e.source);
               return (
-                <div key={i} onClick={() => setClickedNode({ label: e.source.split("/").pop(), fullPath: e.source, dir: e.source.split("/").slice(0, -1).join("/"), isChanged: false, isAffected: false, symbols: [] })} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", marginBottom: 4, borderRadius: 7, background: "#F8FAFC", border: "1px solid #E2E8F0", cursor: "pointer", transition: "all .15s" }}
+                <div key={i} onClick={() => setClickedNode({ label: e.source.split("/").pop(), fullPath: e.source, dir: e.source.split("/").slice(0, -1).join("/"), isChanged: false, isAffected: false, symbols: [] })}
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", marginBottom: 4, borderRadius: 7, background: "#F8FAFC", border: "1px solid #E2E8F0", cursor: "pointer", transition: "all .15s" }}
                   onMouseEnter={ev => { ev.currentTarget.style.borderColor = t.border; ev.currentTarget.style.background = t.light; }}
                   onMouseLeave={ev => { ev.currentTarget.style.borderColor = "#E2E8F0"; ev.currentTarget.style.background = "#F8FAFC"; }}>
                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: t.dot, flexShrink: 0 }} />
@@ -271,11 +271,9 @@ export default function App() {
             })}
           </div>
         )}
-
         {fileEdgesOut.length === 0 && fileEdgesIn.length === 0 && (
           <div style={{ fontSize: 11, color: "#CBD5E0", fontStyle: "italic" }}>No import relationships found for this file.</div>
         )}
-
         <button onClick={() => { setChatIn(`Tell me more about ${node.label} and its role in this codebase`); setChatTab("chat"); }}
           style={{ padding: "8px", borderRadius: 8, border: "1.5px solid #E2E8F0", background: "#F8FAFC", color: "#475569", fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all .15s" }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = "#93C5FD"; e.currentTarget.style.color = "#1D4ED8"; e.currentTarget.style.background = "#EFF6FF"; }}
@@ -314,8 +312,10 @@ export default function App() {
 
       <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
 
-        {/* ── LEFT SIDEBAR ── */}
+        {/* LEFT SIDEBAR */}
         <div style={{ width: 272, flexShrink: 0, display: "flex", flexDirection: "column", background: "#FFFFFF", borderRight: "1px solid #E2E8F0", boxShadow: "4px 0 24px #00000008", overflow: "hidden", zIndex: 2 }}>
+
+          {/* Logo */}
           <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid #EDF2F7", flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg,#3B82F6,#1D4ED8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, boxShadow: "0 4px 14px #3B82F640", flexShrink: 0 }}>💥</div>
@@ -326,6 +326,7 @@ export default function App() {
             </div>
           </div>
 
+          {/* Project input */}
           <div style={{ padding: "13px 20px", borderBottom: "1px solid #EDF2F7", flexShrink: 0 }}>
             <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 7 }}>Project</div>
             <div style={{ display: "flex", gap: 6 }}>
@@ -338,39 +339,66 @@ export default function App() {
                 {loadingG ? "···" : "Load"}
               </button>
             </div>
-            {gData && <div style={{ marginTop: 7, display: "flex", gap: 6 }}>
-              <span style={{ fontSize: 10, color: "#2563EB", background: "#EFF6FF", padding: "2px 9px", borderRadius: 20, fontWeight: 600, border: "1px solid #BFDBFE" }}>{gData.files.length} files</span>
-              <span style={{ fontSize: 10, color: "#059669", background: "#ECFDF5", padding: "2px 9px", borderRadius: 20, fontWeight: 600, border: "1px solid #A7F3D0" }}>{gData.edges.length} imports</span>
-            </div>}
+            {gData && (
+              <div style={{ marginTop: 7, display: "flex", gap: 6 }}>
+                <span style={{ fontSize: 10, color: "#2563EB", background: "#EFF6FF", padding: "2px 9px", borderRadius: 20, fontWeight: 600, border: "1px solid #BFDBFE" }}>{gData.files.length} files</span>
+                <span style={{ fontSize: 10, color: "#059669", background: "#ECFDF5", padding: "2px 9px", borderRadius: 20, fontWeight: 600, border: "1px solid #A7F3D0" }}>{gData.edges.length} imports</span>
+              </div>
+            )}
             {error && <div style={{ marginTop: 7, padding: "6px 9px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, fontSize: 11, color: "#DC2626" }}>⚠ {error}</div>}
           </div>
 
+          {/* MR section */}
           <div style={{ padding: "13px 20px", borderBottom: "1px solid #EDF2F7", flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase" }}>Merge Requests</div>
-              <button onClick={() => setMrList(l => [...l, { id: Date.now(), value: "" }])} style={{ fontSize: 10, color: "#2563EB", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 6, padding: "2px 8px", fontWeight: 600 }}>+ Add</button>
+              <button onClick={() => setMrList(l => [...l, { id: Date.now(), value: "" }])}
+                style={{ fontSize: 10, color: "#2563EB", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 6, padding: "2px 8px", fontWeight: 600 }}>
+                + Add
+              </button>
             </div>
             {mrList.map(mr => (
-              <div key={mr.id} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+              <div key={mr.id} style={{ display: "flex", gap: 5, alignItems: "center", marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>#</span>
-                <input value={mr.value} onChange={e => setMrList(l => l.map(m => m.id === mr.id ? { ...m, value: e.target.value } : m))} placeholder="MR number" type="number"
+                <input value={mr.value} onChange={e => setMrList(l => l.map(m => m.id === mr.id ? { ...m, value: e.target.value } : m))}
+                  placeholder="MR number" type="number"
                   style={{ flex: 1, background: activeMr === mr.value && mr.value ? "#F0FDF4" : "#F8FAFC", border: `1.5px solid ${activeMr === mr.value && mr.value ? "#86EFAC" : "#E2E8F0"}`, borderRadius: 7, padding: "6px 9px", color: "#0F172A", fontSize: 12, fontFamily: "'JetBrains Mono',monospace" }}
                   onFocus={e => { e.target.style.borderColor = "#3B82F6"; e.target.style.boxShadow = "0 0 0 3px #DBEAFE"; }}
                   onBlur={e => { e.target.style.borderColor = activeMr === mr.value && mr.value ? "#86EFAC" : "#E2E8F0"; e.target.style.boxShadow = "none"; }} />
+                {/* Analyze button */}
                 <button onClick={() => analyze(mr.value)} disabled={loadingA || !gData || !mr.value}
-                  style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: !gData || loadingA ? "#EDF2F7" : "linear-gradient(135deg,#3B82F6,#1D4ED8)", color: !gData || loadingA ? "#94A3B8" : "#fff", fontWeight: 800, fontSize: 13, flexShrink: 0, boxShadow: !gData || loadingA ? "none" : "0 2px 8px #3B82F640" }}>
+                  title="Analyze blast radius"
+                  style={{ padding: "6px 10px", borderRadius: 7, border: "none", background: !gData || loadingA ? "#EDF2F7" : "linear-gradient(135deg,#3B82F6,#1D4ED8)", color: !gData || loadingA ? "#94A3B8" : "#fff", fontWeight: 800, fontSize: 13, flexShrink: 0, boxShadow: !gData || loadingA ? "none" : "0 2px 8px #3B82F640" }}>
                   {loadingA && activeMr === mr.value ? "·" : "→"}
                 </button>
-                <button onClick={() => triggerWebhook(mr.value)} disabled={!mr.value || webhookLoading === mr.value}
+                {/* Post to GitLab button */}
+                <button
+                  onClick={() => triggerWebhook(mr.value)}
+                  disabled={!mr.value || webhookLoading === mr.value}
                   title="Post blast radius comment to GitLab MR"
-                  style={{ padding: "6px 9px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: webhookLoading === mr.value ? "#EDF2F7" : "#F8FAFC", color: webhookLoading === mr.value ? "#94A3B8" : "#475569", fontSize: 12, flexShrink: 0, boxShadow: "none" }}>
-                  {webhookLoading === mr.value ? "·" : "💬"}
+                  style={{
+                    padding: "6px 9px",
+                    borderRadius: 7,
+                    border: `1.5px solid ${webhookStatus[mr.value] === "done" ? "#86EFAC" : "#E2E8F0"}`,
+                    background: webhookStatus[mr.value] === "done" ? "#F0FDF4" : webhookLoading === mr.value ? "#EDF2F7" : "#F8FAFC",
+                    color: webhookStatus[mr.value] === "done" ? "#059669" : webhookLoading === mr.value ? "#94A3B8" : "#475569",
+                    fontSize: 13,
+                    flexShrink: 0,
+                  }}>
+                  {webhookLoading === mr.value ? "·" : webhookStatus[mr.value] === "done" ? "✓" : "💬"}
                 </button>
-                {mrList.length > 1 && <button onClick={() => setMrList(l => l.filter(m => m.id !== mr.id))} style={{ padding: "6px 7px", borderRadius: 7, border: "1px solid #E2E8F0", background: "none", color: "#CBD5E0", fontSize: 12 }}>✕</button>}
+                {mrList.length > 1 && (
+                  <button onClick={() => setMrList(l => l.filter(m => m.id !== mr.id))}
+                    style={{ padding: "6px 7px", borderRadius: 7, border: "1px solid #E2E8F0", background: "none", color: "#CBD5E0", fontSize: 12 }}>✕</button>
+                )}
               </div>
             ))}
+            <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 4, lineHeight: 1.6 }}>
+              <span style={{ fontWeight: 700 }}>→</span> analyze graph &nbsp;·&nbsp; <span style={{ fontWeight: 700 }}>💬</span> post comment to GitLab
+            </div>
           </div>
 
+          {/* Stats grid */}
           {aData && (
             <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: "#EDF2F7", borderBottom: "1px solid #EDF2F7", flexShrink: 0 }}>
               {[{ label: "Changed", value: aData.changed_files.length, color: "#2563EB" }, { label: "At Risk", value: totalRisk, color: "#D97706" }, { label: "Symbols", value: totalSym, color: "#DC2626" }, { label: "Risk Level", value: leaderboard[0]?.label || "Low", color: leaderboard[0]?.color || "#059669" }].map(({ label, value, color }) => (
@@ -382,11 +410,10 @@ export default function App() {
             </div>
           )}
 
+          {/* File list / leaderboard */}
           <div style={{ flex: 1, overflow: "auto", paddingTop: 8 }}>
             <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", padding: "4px 20px 7px" }}>{aData ? "Risk Leaderboard" : "File Index"}</div>
             {!gData && !loadingG && <div style={{ padding: "6px 20px", color: "#CBD5E0", fontSize: 11, lineHeight: 1.8 }}>Load a project to get started.</div>}
-
-            {/* Color legend */}
             {gData && !aData && (
               <div style={{ padding: "0 20px 10px", display: "flex", flexWrap: "wrap", gap: 5 }}>
                 {[{ label: "auth", color: "#7C3AED", bg: "#F5F3FF" }, { label: "api", color: "#2563EB", bg: "#EFF6FF" }, { label: "utils", color: "#059669", bg: "#ECFDF5" }, { label: "agent", color: "#EA580C", bg: "#FFF7ED" }, { label: "test", color: "#6B7280", bg: "#F9FAFB" }].map(({ label, color, bg }) => (
@@ -394,9 +421,9 @@ export default function App() {
                 ))}
               </div>
             )}
-
             {aData ? leaderboard.map((item, i) => (
-              <div key={item.fullPath} className="row fade-in" style={{ padding: "9px 20px", cursor: "pointer", background: selFile === item.fullPath ? "#F8FAFC" : "transparent", borderLeft: `3px solid ${selFile === item.fullPath ? item.color : "transparent"}`, animationDelay: `${i * 0.03}s`, transition: "all .15s" }}
+              <div key={item.fullPath} className="row fade-in"
+                style={{ padding: "9px 20px", cursor: "pointer", background: selFile === item.fullPath ? "#F8FAFC" : "transparent", borderLeft: `3px solid ${selFile === item.fullPath ? item.color : "transparent"}`, animationDelay: `${i * 0.03}s`, transition: "all .15s" }}
                 onClick={() => { setSelFile(selFile === item.fullPath ? null : item.fullPath); setClickedNode({ label: item.file, fullPath: item.fullPath, dir: item.fullPath.split("/").slice(0, -1).join("/"), isChanged: aData?.changed_files.includes(item.fullPath), isAffected: true, symbols: [] }); setChatTab("file"); }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ fontSize: 10, color: "#CBD5E0", width: 14, fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
@@ -409,13 +436,15 @@ export default function App() {
               </div>
             )) : gData?.files.map((f, i) => {
               const th = dirTheme(f.path);
+              const fname = f.path.split("/").pop();
               return (
-                <div key={f.path} className="row fade-in" style={{ padding: "8px 20px", cursor: "pointer", background: selFile === f.path ? th.light : "transparent", borderLeft: `3px solid ${selFile === f.path ? th.accent : "transparent"}`, animationDelay: `${i * 0.02}s`, transition: "all .15s" }}
-                  onClick={() => { setSelFile(selFile === f.path ? null : f.path); setClickedNode({ label: f.name, fullPath: f.path, dir: f.path.split("/").slice(0, -1).join("/"), isChanged: false, isAffected: false, symbols: [] }); setChatTab("file"); }}>
+                <div key={f.path} className="row fade-in"
+                  style={{ padding: "8px 20px", cursor: "pointer", background: selFile === f.path ? th.light : "transparent", borderLeft: `3px solid ${selFile === f.path ? th.accent : "transparent"}`, animationDelay: `${i * 0.02}s`, transition: "all .15s" }}
+                  onClick={() => { setSelFile(selFile === f.path ? null : f.path); setClickedNode({ label: fname, fullPath: f.path, dir: f.path.split("/").slice(0, -1).join("/"), isChanged: false, isAffected: false, symbols: [] }); setChatTab("file"); }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={{ width: 6, height: 6, borderRadius: "50%", background: descs[f.path] ? th.dot : "#E2E8F0", flexShrink: 0, transition: "background .4s", boxShadow: descs[f.path] ? `0 0 5px ${th.dot}88` : "none" }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</div>
+                      <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fname}</div>
                       <div style={{ fontSize: 9, color: "#94A3B8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 1 }}>{f.path}</div>
                     </div>
                   </div>
@@ -426,24 +455,24 @@ export default function App() {
           </div>
         </div>
 
-        {/* ── CENTER GRAPH ── */}
+        {/* CENTER GRAPH */}
         <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#F8FAFC" }}>
           {!gData && !loadingG && (
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, pointerEvents: "none", userSelect: "none" }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#CBD5E0", letterSpacing: 4, textTransform: "uppercase", marginBottom: 16 }}>
-                  GitLab Transcend Hackathon 2026
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", letterSpacing: 4, textTransform: "uppercase", marginBottom: 16 }}>
+                  GitLab Transcend Hackathon 2026 · Showcase Track
                 </div>
-                <div style={{ fontSize: 80, fontWeight: 900, color: "#EDF2F7", letterSpacing: "-3px", lineHeight: 1, fontFamily: "'Inter', sans-serif" }}>
+                <div style={{ fontSize: 72, fontWeight: 900, color: "#D1D8E0", letterSpacing: "-3px", lineHeight: 1, fontFamily: "'Inter', sans-serif" }}>
                   Blast Radius
                 </div>
-                <div style={{ fontSize: 15, color: "#CBD5E0", marginTop: 14, fontWeight: 500 }}>
+                <div style={{ fontSize: 15, color: "#94A3B8", marginTop: 14, fontWeight: 500 }}>
                   Know what breaks before you merge
                 </div>
-                <div style={{ marginTop: 12, fontSize: 11, color: "#E2E8F0", fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+                <div style={{ marginTop: 10, fontSize: 11, color: "#B0BEC5", fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
                   Powered by GitLab Orbit · Claude Sonnet 4.6
                 </div>
-                <div style={{ marginTop: 24, fontSize: 11, color: "#E2E8F0" }}>
+                <div style={{ marginTop: 20, fontSize: 11, color: "#B0BEC5" }}>
                   ← Load a project to visualize its dependency graph
                 </div>
               </div>
@@ -475,9 +504,8 @@ export default function App() {
           )}
         </div>
 
-        {/* ── RIGHT PANEL ── */}
+        {/* RIGHT PANEL */}
         <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column", background: "#FFFFFF", borderLeft: "1px solid #E2E8F0", boxShadow: "-4px 0 24px #00000008", overflow: "hidden", zIndex: 2 }}>
-          {/* Tabs */}
           <div style={{ display: "flex", borderBottom: "1px solid #EDF2F7", background: "#FAFAFA", flexShrink: 0 }}>
             {[{ key: "chat", label: "💬 Chat" }, { key: "file", label: "📄 File" }].map(({ key, label }) => (
               <button key={key} onClick={() => setChatTab(key)}
@@ -510,7 +538,8 @@ export default function App() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 2 }}>
                     <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 500 }}>Try asking:</div>
                     {suggestions.map(s => (
-                      <button key={s} onClick={() => setChatIn(s)} style={{ textAlign: "left", padding: "8px 11px", borderRadius: 10, border: "1px solid #E2E8F0", background: "#F8FAFC", color: "#475569", fontSize: 11, fontWeight: 500, lineHeight: 1.4 }}
+                      <button key={s} onClick={() => setChatIn(s)}
+                        style={{ textAlign: "left", padding: "8px 11px", borderRadius: 10, border: "1px solid #E2E8F0", background: "#F8FAFC", color: "#475569", fontSize: 11, fontWeight: 500, lineHeight: 1.4 }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = "#93C5FD"; e.currentTarget.style.color = "#1D4ED8"; e.currentTarget.style.background = "#EFF6FF"; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.color = "#475569"; e.currentTarget.style.background = "#F8FAFC"; }}>
                         {s}
