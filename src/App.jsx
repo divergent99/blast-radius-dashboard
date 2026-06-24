@@ -22,15 +22,46 @@ const dirTheme = (path = "") => {
   return                          { accent: "#64748B", light: "#F8FAFC", border: "#CBD5E0", label: "#475569", dot: "#94A3B8" };
 };
 
+const renderTableHTML = (block) => {
+  const rows = block.trim().split("\n").filter(r => r.trim());
+  if (rows.length < 2) return block;
+  const headerCells = rows[0].split("|").map(c => c.trim()).filter(Boolean);
+  const bodyRows = rows.slice(2); // skip separator row
+  const thStyle = "border:1px solid #E2E8F0;padding:5px 8px;background:#F8FAFC;font-weight:700;color:#1A202C;text-align:left";
+  const tdStyle = "border:1px solid #E2E8F0;padding:5px 8px;color:#4A5568";
+  const ths = headerCells.map(c => `<th style="${thStyle}">${c}</th>`).join("");
+  const trs = bodyRows.map(row => {
+    const cells = row.split("|").map(c => c.trim()).filter(Boolean);
+    return `<tr>${cells.map(c => `<td style="${tdStyle}">${c}</td>`).join("")}</tr>`;
+  }).join("");
+  return `<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:11px"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+};
+
 const MD = ({ text }) => {
   if (!text) return null;
-  const html = text
+
+  let html = text;
+
+  // Replace markdown tables first (before other transforms)
+  html = html.replace(/((?:\|.*\|\n?)+)/g, (match) => {
+    const lines = match.trim().split("\n");
+    if (lines.length >= 2 && /^[|\-\s]+$/.test(lines[1])) {
+      return renderTableHTML(match);
+    }
+    return match;
+  });
+
+  html = html
     .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#1A202C;font-weight:700">$1</strong>')
     .replace(/`(.+?)`/g, '<code style="background:#EDF2F7;color:#2D3748;padding:1px 5px;border-radius:4px;font-family:JetBrains Mono,monospace;font-size:10px">$1</code>')
     .replace(/^### (.+)$/gm, '<p style="font-weight:700;color:#1A202C;margin:10px 0 3px;font-size:12px">$1</p>')
     .replace(/^## (.+)$/gm,  '<p style="font-weight:800;color:#1A202C;margin:12px 0 4px;font-size:13px">$1</p>')
+    .replace(/^> (.+)$/gm,   '<div style="border-left:3px solid #CBD5E0;padding:4px 10px;margin:4px 0;color:#718096;font-style:italic">$1</div>')
     .replace(/^- (.+)$/gm,   '<div style="padding-left:14px;margin:2px 0;color:#4A5568">· $1</div>')
-    .replace(/\n\n/g, '<div style="height:6px"></div>').replace(/\n/g, "<br/>");
+    .replace(/^\d+\. (.+)$/gm, '<div style="padding-left:14px;margin:2px 0;color:#4A5568">$1</div>')
+    .replace(/\n\n/g, '<div style="height:6px"></div>')
+    .replace(/\n/g, "<br/>");
+
   return <div dangerouslySetInnerHTML={{ __html: html }} style={{ fontSize: 12, color: "#4A5568", lineHeight: 1.65, textAlign: "left" }} />;
 };
 
