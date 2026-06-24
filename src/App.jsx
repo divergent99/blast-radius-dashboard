@@ -313,7 +313,7 @@ export default function App() {
       <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
 
         {/* LEFT SIDEBAR */}
-        <div style={{ width: 272, flexShrink: 0, display: "flex", flexDirection: "column", background: "#FFFFFF", borderRight: "1px solid #E2E8F0", boxShadow: "4px 0 24px #00000008", overflow: "hidden", zIndex: 2 }}>
+        <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column", background: "#FFFFFF", borderRight: "1px solid #E2E8F0", boxShadow: "4px 0 24px #00000008", overflow: "hidden", zIndex: 2 }}>
 
           {/* Logo */}
           <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid #EDF2F7", flexShrink: 0 }}>
@@ -358,39 +358,33 @@ export default function App() {
               </button>
             </div>
             {mrList.map(mr => (
-              <div key={mr.id} style={{ display: "flex", gap: 5, alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>#</span>
-                <input value={mr.value} onChange={e => setMrList(l => l.map(m => m.id === mr.id ? { ...m, value: e.target.value } : m))}
-                  placeholder="MR number" type="number"
-                  style={{ flex: 1, background: activeMr === mr.value && mr.value ? "#F0FDF4" : "#F8FAFC", border: `1.5px solid ${activeMr === mr.value && mr.value ? "#86EFAC" : "#E2E8F0"}`, borderRadius: 7, padding: "6px 9px", color: "#0F172A", fontSize: 12, fontFamily: "'JetBrains Mono',monospace" }}
-                  onFocus={e => { e.target.style.borderColor = "#3B82F6"; e.target.style.boxShadow = "0 0 0 3px #DBEAFE"; }}
-                  onBlur={e => { e.target.style.borderColor = activeMr === mr.value && mr.value ? "#86EFAC" : "#E2E8F0"; e.target.style.boxShadow = "none"; }} />
-                {/* Analyze button */}
-                <button onClick={() => analyze(mr.value)} disabled={loadingA || !gData || !mr.value}
-                  title="Analyze blast radius"
-                  style={{ padding: "6px 10px", borderRadius: 7, border: "none", background: !gData || loadingA ? "#EDF2F7" : "linear-gradient(135deg,#3B82F6,#1D4ED8)", color: !gData || loadingA ? "#94A3B8" : "#fff", fontWeight: 800, fontSize: 13, flexShrink: 0, boxShadow: !gData || loadingA ? "none" : "0 2px 8px #3B82F640" }}>
-                  {loadingA && activeMr === mr.value ? "·" : "→"}
-                </button>
-                {/* Post to GitLab button */}
-                <button
-                  onClick={() => triggerWebhook(mr.value)}
-                  disabled={!mr.value || webhookLoading === mr.value}
-                  title="Post blast radius comment to GitLab MR"
-                  style={{
-                    padding: "6px 9px",
-                    borderRadius: 7,
-                    border: `1.5px solid ${webhookStatus[mr.value] === "done" ? "#86EFAC" : "#E2E8F0"}`,
-                    background: webhookStatus[mr.value] === "done" ? "#F0FDF4" : webhookLoading === mr.value ? "#EDF2F7" : "#F8FAFC",
-                    color: webhookStatus[mr.value] === "done" ? "#059669" : webhookLoading === mr.value ? "#94A3B8" : "#475569",
-                    fontSize: 13,
-                    flexShrink: 0,
-                  }}>
-                  {webhookLoading === mr.value ? "·" : webhookStatus[mr.value] === "done" ? "✓" : "💬"}
-                </button>
-                {mrList.length > 1 && (
-                  <button onClick={() => setMrList(l => l.filter(m => m.id !== mr.id))}
-                    style={{ padding: "6px 7px", borderRadius: 7, border: "1px solid #E2E8F0", background: "none", color: "#CBD5E0", fontSize: 12 }}>✕</button>
-                )}
+              <div key={mr.id} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", gap: 5, alignItems: "center", marginBottom: 5 }}>
+                  <span style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>#</span>
+                  <input value={mr.value} onChange={e => setMrList(l => l.map(m => m.id === mr.id ? { ...m, value: e.target.value } : m))}
+                    placeholder="MR number" type="number"
+                    style={{ flex: 1, background: activeMr === mr.value && mr.value ? "#F0FDF4" : "#F8FAFC", border: `1.5px solid ${activeMr === mr.value && mr.value ? "#86EFAC" : "#E2E8F0"}`, borderRadius: 7, padding: "6px 9px", color: "#0F172A", fontSize: 12, fontFamily: "'JetBrains Mono',monospace" }}
+                    onFocus={e => { e.target.style.borderColor = "#3B82F6"; e.target.style.boxShadow = "0 0 0 3px #DBEAFE"; }}
+                    onBlur={e => { e.target.style.borderColor = activeMr === mr.value && mr.value ? "#86EFAC" : "#E2E8F0"; e.target.style.boxShadow = "none"; }} />
+                  {mrList.length > 1 && (
+                    <button onClick={() => setMrList(l => l.filter(m => m.id !== mr.id))}
+                      style={{ padding: "5px 7px", borderRadius: 7, border: "1px solid #E2E8F0", background: "none", color: "#CBD5E0", fontSize: 11 }}>✕</button>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => analyze(mr.value)} disabled={loadingA || !gData || !mr.value}
+                    title="Analyze blast radius on graph"
+                    style={{ flex: 1, padding: "7px 0", borderRadius: 7, border: "none", background: !gData || loadingA ? "#EDF2F7" : "linear-gradient(135deg,#3B82F6,#1D4ED8)", color: !gData || loadingA ? "#94A3B8" : "#fff", fontWeight: 700, fontSize: 11, boxShadow: !gData || loadingA ? "none" : "0 2px 8px #3B82F640" }}>
+                    {loadingA && activeMr === mr.value ? "···" : "→ Analyze"}
+                  </button>
+                  <button
+                    onClick={() => triggerWebhook(mr.value)}
+                    disabled={!mr.value || webhookLoading === mr.value}
+                    title="Post blast radius comment to GitLab MR"
+                    style={{ flex: 1, padding: "7px 0", borderRadius: 7, border: `1.5px solid ${webhookStatus[mr.value] === "done" ? "#86EFAC" : "#E2E8F0"}`, background: webhookStatus[mr.value] === "done" ? "#F0FDF4" : webhookLoading === mr.value ? "#EDF2F7" : "#F8FAFC", color: webhookStatus[mr.value] === "done" ? "#059669" : webhookLoading === mr.value ? "#94A3B8" : "#475569", fontSize: 11, fontWeight: 600 }}>
+                    {webhookLoading === mr.value ? "···" : webhookStatus[mr.value] === "done" ? "✓ Posted!" : "💬 Post to GL"}
+                  </button>
+                </div>
               </div>
             ))}
             <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 4, lineHeight: 1.6 }}>
@@ -463,10 +457,10 @@ export default function App() {
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", letterSpacing: 4, textTransform: "uppercase", marginBottom: 16 }}>
                   GitLab Transcend Hackathon 2026 · Showcase Track
                 </div>
-                <div style={{ fontSize: 72, fontWeight: 900, color: "#D1D8E0", letterSpacing: "-3px", lineHeight: 1, fontFamily: "'Inter', sans-serif" }}>
+                <div style={{ fontSize: 72, fontWeight: 900, color: "#C5CDD8", letterSpacing: "-3px", lineHeight: 1, fontFamily: "'Inter', sans-serif" }}>
                   Blast Radius
                 </div>
-                <div style={{ fontSize: 15, color: "#94A3B8", marginTop: 14, fontWeight: 500 }}>
+                <div style={{ fontSize: 15, color: "#64748B", marginTop: 14, fontWeight: 500 }}>
                   Know what breaks before you merge
                 </div>
                 <div style={{ marginTop: 10, fontSize: 11, color: "#B0BEC5", fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
