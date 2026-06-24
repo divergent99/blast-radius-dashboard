@@ -452,12 +452,12 @@ export default function App() {
         {/* CENTER GRAPH */}
         <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#F8FAFC" }}>
           {!gData && !loadingG && (
-            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, pointerEvents: "none", userSelect: "none" }}>
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, pointerEvents: "none", userSelect: "none", zIndex: 10, background: "#F8FAFC" }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", letterSpacing: 4, textTransform: "uppercase", marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", letterSpacing: 4, textTransform: "uppercase", marginBottom: 16 }}>
                   GitLab Transcend Hackathon 2026 · Showcase Track
                 </div>
-                <div style={{ fontSize: 72, fontWeight: 900, color: "#C5CDD8", letterSpacing: "-3px", lineHeight: 1, fontFamily: "'Inter', sans-serif" }}>
+                <div style={{ fontSize: 72, fontWeight: 900, color: "#94A3B8", letterSpacing: "-3px", lineHeight: 1, fontFamily: "'Inter', sans-serif" }}>
                   Blast Radius
                 </div>
                 <div style={{ fontSize: 15, color: "#64748B", marginTop: 14, fontWeight: 500 }}>
